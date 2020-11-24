@@ -1,11 +1,12 @@
 """The server."""
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, cast
 
 import dotenv
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Request, Response, UploadFile
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, validator
 
-from storage import submission
+from storage import auth, submission
 
 dotenv.load_dotenv()
 
@@ -26,6 +27,33 @@ class SubmissionResponseModel(BaseModel):
                 "The submission_id and error field are mutually exclusive."
             )
         return v
+
+
+@app.middleware("http")
+async def enforce_admin_user(request: Request, call_next: Callable) -> Response:
+    """Only allow requests if a token with Admin scope is supplied."""
+    if "Authorization" not in request.headers:
+        return PlainTextResponse("Authorization header missing.", status_code=401)
+
+    authorization_header = request.headers["Authorization"]
+    if not authorization_header.startswith("Bearer "):
+        return PlainTextResponse(
+            "Invalid Authorization header value. The header "
+            "value must have the format Bearer <token>.",
+            status_code=401,
+        )
+
+    token = request.headers["Authorization"][7:]  # length of "Bearer " is 7
+    try:
+        payload = auth.parse_token(token, refetch_public_key_on_failure=True)
+    except Exception as e:
+        print(e)
+        return PlainTextResponse("Invalid or expired token.", status_code=401)
+
+    if "Admin" not in cast(List, payload.get("roles", [])):
+        return PlainTextResponse("", 403)
+
+    return await call_next(request)
 
 
 @app.post(

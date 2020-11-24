@@ -13,6 +13,7 @@ The following environment variables need to be defined, preferably in the `.env`
 Variable name | Description | Example
 --- | --- | ---
 DATABASE_URL | DSN for the database. | mysql://username:password@my.database.server:3306/my_database
+SALT_API_PUBLIC_KEY_FILE | File where the public key of the SALT API server is stored | /server/salt_api_server_key.pub
 SUBMIT_COMMAND | Command to execute for submitting the content (see below). | submit FILE
 SUBMIT_DIRECTORY | Directory where to store the submitted files. | /home/user/submissions
 
