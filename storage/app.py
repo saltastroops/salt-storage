@@ -62,11 +62,16 @@ async def enforce_admin_user(request: Request, call_next: Callable) -> Response:
     response_model_exclude_none=True,
 )
 async def submit_proposal(
-    proposal: UploadFile = File(...), proposal_code: str = Form(None)
+    proposal: UploadFile = File(...),
+    submitter: str = Form(...),
+    proposal_code: str = Form(None),
 ) -> Dict[str, str]:
     """Submit a proposal."""
     try:
-        submission_id = await submission.submit(proposal, proposal_code)
+        submission_id = await submission.submit(
+            content=proposal, submitter=submitter, proposal_code=proposal_code
+        )
         return {"submission_id": submission_id}
-    except Exception:
+    except Exception as e:
+        print(e)
         return {"error": "The proposal submission has failed."}

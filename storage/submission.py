@@ -1,53 +1,105 @@
 """Submit proposal content."""
-
+import asyncio
 import os
 import pathlib
 import subprocess
 import threading
 import uuid
-from enum import Enum
 from typing import Optional, cast
 
+import databases
 from fastapi import UploadFile
 
+from storage.repository.submission_repository import (
+    SubmissionMessageType,
+    SubmissionStatus,
+    create_submission,
+    log_submission_message,
+    update_submission,
+)
 
-class MessageType(Enum):
-    """Submission message types."""
 
-    ERROR = "Error"
-    INFO = "Info"
-    WARNING = "Warning"
-
-
-async def submit(content: UploadFile, proposal_code: Optional[str]) -> str:
+async def submit(
+    content: UploadFile, submitter: str, proposal_code: Optional[str]
+) -> str:
     """
     Submit proposal content.
 
-    The function returns an id for the submission, which can be used for subscribing to
-    the submission log.
+    The function returns an identifier for the submission, which can be used for
+    subscribing to the submission progress.
     """
-    submission_id = str(uuid.uuid4())
+    submission_identifier = str(uuid.uuid4())
     proposal_filepath = await save_submitted_content(content)
     t = threading.Thread(
-        target=execute_submission,
-        args=[proposal_filepath, proposal_code, submission_id],
+        target=call_execute_submission,
+        args=[proposal_filepath, proposal_code, submission_identifier, submitter],
     )
     t.start()
-    return submission_id
+    return submission_identifier
 
 
-def execute_submission(
-    proposal: pathlib.Path, proposal_code: Optional[str], submission_id: str
+def call_execute_submission(
+    proposal: pathlib.Path,
+    proposal_code: Optional[str],
+    submission_identifier: str,
+    submitter: str,
+) -> None:
+    """Call the execute_submission in a new event loop."""
+    asyncio.run(
+        execute_submission(
+            proposal=proposal,
+            proposal_code=proposal_code,
+            submission_identifier=submission_identifier,
+            submitter=submitter,
+        )
+    )
+
+
+async def execute_submission(
+    proposal: pathlib.Path,
+    proposal_code: Optional[str],
+    submission_identifier: str,
+    submitter: str,
 ) -> None:
     """Execute the submission."""
-    command = os.environ["SUBMIT_COMMAND"].replace("FILE", str(proposal.absolute()))
-    subprocess.run(command.split(" "))
-    # if cp.returncode:
-    #     message_type = MessageType.ERROR
-    #     message = "Submission failed."
-    # else:
-    #     message_type = MessageType.INFO
-    #     message = "Submission successful."
+    DATABASE_DSN = os.environ["DATABASE_URL"]
+    async with databases.Database(DATABASE_DSN) as database:
+        await create_submission(
+            database=database, identifier=submission_identifier, submitter=submitter
+        )
+        await log_submission_message(
+            database=database,
+            identifier=submission_identifier,
+            message="Submission started.",
+            message_type=SubmissionMessageType.INFO,
+        )
+        command_string = os.environ["SUBMIT_COMMAND"].replace(
+            "FILE", str(proposal.absolute())
+        )
+        command = command_string.split(" ")
+        if proposal_code:
+            command.insert(-2, "-proposalCode")
+            command.insert(-2, proposal_code)
+        cp = subprocess.run(command)
+        if cp.returncode:
+            submission_status = SubmissionStatus.FAILED
+            message_type = SubmissionMessageType.ERROR
+            message = "Submission failed."
+        else:
+            submission_status = SubmissionStatus.SUCCESSFUL
+            message_type = SubmissionMessageType.INFO
+            message = "Submission successful."
+        await log_submission_message(
+            database=database,
+            identifier=submission_identifier,
+            message=message,
+            message_type=message_type,
+        )
+        await update_submission(
+            database=database,
+            identifier=submission_identifier,
+            status=submission_status,
+        )
 
 
 async def save_submitted_content(content: UploadFile) -> pathlib.Path:
