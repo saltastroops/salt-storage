@@ -56,7 +56,6 @@ def update_public_key() -> str:
 def request_public_key() -> str:
     """Request the public key for token authentication from the SALT API server."""
     response = httpx.get(f"{os.environ['SALT_API_URL']}/public-key")
-    print(f"{os.environ['SALT_API_URL']}/public-key", response)
     if response.status_code != 200:
         raise Exception(
             "The public key could not be requested from the SALT API server."

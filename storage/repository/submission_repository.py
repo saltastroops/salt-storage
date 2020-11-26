@@ -25,7 +25,6 @@ async def create_submission(
     database: Database, identifier: str, submitter: str, proposal_code: Optional[str]
 ) -> None:
     """Create a new submission entry in the database."""
-    print("PC", proposal_code)
     query = """
 INSERT INTO Submission (Identifier, Submitter_Id, ProposalCode_Id, SubmissionStatus_Id,
                         StartedAt)

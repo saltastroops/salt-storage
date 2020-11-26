@@ -46,8 +46,7 @@ async def enforce_admin_user(request: Request, call_next: Callable) -> Response:
     token = request.headers["Authorization"][7:]  # length of "Bearer " is 7
     try:
         payload = auth.parse_token(token, refetch_public_key_on_failure=True)
-    except Exception as e:
-        print(e)
+    except Exception:
         return PlainTextResponse("Invalid or expired token.", status_code=401)
 
     if "Admin" not in cast(List, payload.get("roles", [])):
@@ -72,6 +71,5 @@ async def submit_proposal(
             content=proposal, submitter=submitter, proposal_code=proposal_code
         )
         return {"submission_id": submission_id}
-    except Exception as e:
-        print(e)
+    except Exception:
         return {"error": "The proposal submission has failed."}
