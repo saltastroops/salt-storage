@@ -1,5 +1,6 @@
 """Submission related database access."""
 import enum
+from typing import Optional
 
 from databases import Database
 
@@ -21,20 +22,35 @@ class SubmissionMessageType(enum.Enum):
 
 
 async def create_submission(
-    database: Database, identifier: str, submitter: str
+    database: Database, identifier: str, submitter: str, proposal_code: Optional[str]
 ) -> None:
     """Create a new submission entry in the database."""
+    print("PC", proposal_code)
     query = """
-INSERT INTO Submission (Identifier, Submitter_Id, SubmissionStatus_Id, StartedAt)
+INSERT INTO Submission (Identifier, Submitter_Id, ProposalCode_Id, SubmissionStatus_Id,
+                        StartedAt)
     VALUES (
         :identifier,
         (SELECT PiptUser_Id FROM PiptUser WHERE Username=:username),
+        IF(
+           ISNULL(:proposal_code),
+           NULL,
+           (
+               SELECT ProposalCode_Id
+               FROM ProposalCode
+               WHERE Proposal_Code = :proposal_code
+           )
+        ),
         (SELECT SubmissionStatus_Id FROM SubmissionStatus
          WHERE SubmissionStatus='In Progress'),
         NOW()
     )
     """
-    values = {"identifier": identifier, "username": submitter}
+    values = {
+        "identifier": identifier,
+        "username": submitter,
+        "proposal_code": proposal_code,
+    }
     await database.execute(query=query, values=values)
 
 
@@ -61,12 +77,21 @@ async def log_submission_message(
 ) -> None:
     """Log a submission message in the database."""
     query = """
-INSERT INTO SubmissionLogEntry (Submission_Id, Message, SubmissionMessageType_Id)
+INSERT INTO SubmissionLogEntry (SubmissionLogEntryNumber, Submission_Id, Message,
+                                SubmissionMessageType_Id)
     VALUES (
+        (
+            SELECT COUNT(*) + 1
+            FROM SubmissionLogEntry sle
+            JOIN Submission s ON sle.Submission_Id = s.Submission_Id
+            WHERE s.Identifier = :identifier
+        ),
         (SELECT Submission_Id FROM Submission WHERE Identifier=:identifier),
         :message,
-        (SELECT SubmissionMessageType_Id FROM SubmissionMessageType
-         WHERE SubmissionMessageType=:message_type)
+        (
+            SELECT SubmissionMessageType_Id FROM SubmissionMessageType
+            WHERE SubmissionMessageType=:message_type
+        )
     )
     """
     values = {

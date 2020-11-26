@@ -8,6 +8,7 @@ import uuid
 from typing import Optional, cast
 
 import databases
+from dotenv import load_dotenv
 from fastapi import UploadFile
 
 from storage.repository.submission_repository import (
@@ -17,6 +18,9 @@ from storage.repository.submission_repository import (
     log_submission_message,
     update_submission,
 )
+
+load_dotenv()
+DATABASE_DSN = os.environ["DATABASE_URL"]
 
 
 async def submit(
@@ -29,6 +33,13 @@ async def submit(
     subscribing to the submission progress.
     """
     submission_identifier = str(uuid.uuid4())
+    async with databases.Database(DATABASE_DSN) as database:
+        await create_submission(
+            database=database,
+            identifier=submission_identifier,
+            submitter=submitter,
+            proposal_code=proposal_code,
+        )
     proposal_filepath = await save_submitted_content(content)
     t = threading.Thread(
         target=call_execute_submission,
@@ -62,11 +73,7 @@ async def execute_submission(
     submitter: str,
 ) -> None:
     """Execute the submission."""
-    DATABASE_DSN = os.environ["DATABASE_URL"]
     async with databases.Database(DATABASE_DSN) as database:
-        await create_submission(
-            database=database, identifier=submission_identifier, submitter=submitter
-        )
         await log_submission_message(
             database=database,
             identifier=submission_identifier,
@@ -78,8 +85,14 @@ async def execute_submission(
         )
         command = command_string.split(" ")
         if proposal_code:
-            command.insert(-2, "-proposalCode")
-            command.insert(-2, proposal_code)
+            command.insert(-1, "-proposalCode")
+            command.insert(-1, proposal_code)
+        await log_submission_message(
+            database=database,
+            identifier=submission_identifier,
+            message="Inserting proposal into the database",
+            message_type=SubmissionMessageType.INFO,
+        )
         cp = subprocess.run(command)
         if cp.returncode:
             submission_status = SubmissionStatus.FAILED
