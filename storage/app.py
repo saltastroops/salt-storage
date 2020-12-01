@@ -71,5 +71,5 @@ async def submit_proposal(
             content=proposal, submitter=submitter, proposal_code=proposal_code
         )
         return {"submission_id": submission_id}
-    except Exception:
-        return {"error": "The proposal submission has failed."}
+    except Exception as e:
+        return {"error": str(e)}

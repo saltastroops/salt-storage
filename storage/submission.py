@@ -2,9 +2,11 @@
 import asyncio
 import os
 import pathlib
+import re
 import subprocess
 import threading
 import uuid
+from datetime import datetime
 from typing import Optional, cast
 
 import databases
@@ -40,7 +42,7 @@ async def submit(
             submitter=submitter,
             proposal_code=proposal_code,
         )
-    proposal_filepath = await save_submitted_content(content)
+    proposal_filepath = await save_submitted_content(content, submission_identifier)
     t = threading.Thread(
         target=call_execute_submission,
         args=[proposal_filepath, proposal_code, submission_identifier, submitter],
@@ -80,8 +82,10 @@ async def execute_submission(
             message="Submission started.",
             message_type=SubmissionMessageType.INFO,
         )
-        command_string = os.environ["SUBMIT_COMMAND"].replace(
-            "FILE", str(proposal.absolute())
+        command_string = submission_command(
+            content=proposal.absolute(),
+            submitter=submitter,
+            proposal_code=proposal_code,
         )
         command = command_string.split(" ")
         if proposal_code:
@@ -115,17 +119,56 @@ async def execute_submission(
         )
 
 
-async def save_submitted_content(content: UploadFile) -> pathlib.Path:
+def submission_command(
+    content: pathlib.Path, submitter: str, proposal_code: Optional[str]
+) -> str:
+    """Generate the command for submitting the proposal."""
+    log_name = mapping_log_name(proposal_code)
+    command = f"""
+    java -Xms85m -Xmx1024m
+         -jar {os.environ['WEB_MANAGER_DIR']}/java/MappingService.jar
+         -access {os.environ['WEB_MANAGER_DIR']}/java/DatabaseAccess.conf
+         -log {os.environ['WEB_MANAGER_DIR']}/replicate/mapper_logs/{log_name}
+         -user {submitter}
+         -convert {os.environ['CONVERT_COMMAND']}
+         -save {os.environ['WEB_MANAGER_DIR']}/replicate/proposals
+         -file {content}
+         {('-proposalCode ' + proposal_code) if proposal_code else ""}
+         -piptDir {os.environ['PIPT_DIR']}
+         -server {os.environ['WEB_MANAGER_URL']}
+         -ephemerisUrl {os.environ['EPHEMERIS_URL']}
+         -findingChartGenerationScript {os.environ['FINDER_CHART_TOOL']}
+         -python python
+         -sentryDSN {os.environ['SENTRY_DSN']}
+         {os.environ['MAPPING_TOOL_API_KEY']}
+    """
+    command = re.sub(r"\s+", " ", command)
+    command = command.replace("\n", "").strip()
+    return command
+
+
+async def save_submitted_content(
+    content: UploadFile, submission_identifier: str
+) -> pathlib.Path:
     """
     Save the submitted proposal.
 
     The path of the generated file is returned.
     """
     await content.seek(0)
-    saved_filepath = pathlib.Path(os.environ["SUBMIT_DIRECTORY"]).joinpath(
-        str(uuid.uuid4())
+    saved_filepath = (
+        pathlib.Path(os.environ["WEB_MANAGER_DIR"])
+        .joinpath("replicate")
+        .joinpath("submissions")
+        .joinpath(submission_identifier)
     )
     with open(saved_filepath, "wb") as f:
         f.write(cast(bytes, await content.read()))
 
     return saved_filepath
+
+
+def mapping_log_name(proposal_code: Optional[str]) -> str:
+    """Generate the name for the log file."""
+    name = f"{proposal_code}-" if proposal_code else ""
+    return name + datetime.now().isoformat()
