@@ -126,12 +126,12 @@ def submission_command(
     log_name = mapping_log_name(proposal_code)
     command = f"""
     java -Xms85m -Xmx1024m
-         -jar {os.environ['WEB_MANAGER_DIR']}/java/MappingService.jar
-         -access {os.environ['WEB_MANAGER_DIR']}/java/DatabaseAccess.conf
-         -log {os.environ['WEB_MANAGER_DIR']}/replicate/mapper_logs/{log_name}
+         -jar {os.environ['MAPPING_TOOL_JAR']}
+         -access {os.environ['MAPPING_TOOL_DATABASE_ACCESS_CONFIG']}
+         -log {os.environ['MAPPING_TOOL_LOG_DIR']}/{log_name}
          -user {submitter}
          -convert {os.environ['CONVERT_COMMAND']}
-         -save {os.environ['WEB_MANAGER_DIR']}/replicate/proposals
+         -save {os.environ['MAPPING_TOOL_PROPOSAL_DIR']}
          -file {content}
          {('-proposalCode ' + proposal_code) if proposal_code else ""}
          -piptDir {os.environ['PIPT_DIR']}
@@ -156,12 +156,7 @@ async def save_submitted_content(
     The path of the generated file is returned.
     """
     await content.seek(0)
-    saved_filepath = (
-        pathlib.Path(os.environ["WEB_MANAGER_DIR"])
-        .joinpath("replicate")
-        .joinpath("submissions")
-        .joinpath(submission_identifier)
-    )
+    saved_filepath = pathlib.Path(os.environ["SUBMISSION_DIR"]) / submission_identifier
     with open(saved_filepath, "wb") as f:
         f.write(cast(bytes, await content.read()))
 
