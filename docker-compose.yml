@@ -14,6 +14,7 @@ services:
       - MAPPING_TOOL_DATABASE_ACCESS_CONFIG=/salt-storage/server/database-access.conf
       - MAPPING_TOOL_JAR=/salt-storage/server/mapping-service.jar
       - MAPPING_TOOL_LOG_DIR=/salt-storage/log
+      - MAPPING_TOOL_PROPOSAL_DIR=/salt-storage/proposals
       - PIPT_DIR=/salt-storage/.PIPT
       - SALT_API_PUBLIC_KEY_FILE=/salt-storage/server/salt_api_key
       - SENTRY_DSN=${SENTRY_DSN}
