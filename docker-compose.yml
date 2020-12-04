@@ -1,0 +1,31 @@
+version: '3.7'
+services:
+  storage:
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      - CONVERT_COMMAND=/usr/bin/convert
+      - DATABASE_URL=${DATABASE_URL}
+      - EPHEMERIS_URL=${EPHEMERIS_URL}
+      - FINDER_CHART_TOOL=${FINDER_CHART_TOOL}
+      - MAPPING_TOOL_API_KEY=${MAPPING_TOOL_API_KEY}
+      - MAPPING_TOOL_DATABASE_ACCESS_CONFIG=/salt-storage/server/database-access.conf
+      - MAPPING_TOOL_JAR=/salt-storage/server/mapping-service.jar
+      - MAPPING_TOOL_LOG_DIR=/salt-storage/log
+      - MAPPING_TOOL_PROPOSAL_DIR=/salt-storage/proposals
+      - PIPT_DIR=/salt-storage/.PIPT
+      - SALT_API_PUBLIC_KEY_FILE=/salt-storage/server/salt_api_key
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SUBMISSION_DIR=/salt-storage/submissions
+      - WEB_MANAGER_URL=${WEB_MANAGER_URL}
+    ports:
+      - ${PORT}:8000
+    volumes:
+      - ${MAPPING_TOOL_DATABASE_ACCESS_CONFIG}:/salt-storage/server/database-access.conf:ro
+      - ${MAPPING_TOOL_JAR}:/salt-storage/server/mapping-service.jar:ro
+      - ${MAPPING_TOOL_LOG_DIR}:/salt-storage/log
+      - ${MAPPING_TOOL_PROPOSAL_DIR}:/salt-storage/proposals
+      - ${PIPT_DIR}:/salt-storage/.PIPT
+      - ${SUBMISSION_DIR}:/salt-storage/submissions
