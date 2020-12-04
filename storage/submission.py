@@ -84,6 +84,7 @@ async def execute_submission(
         )
         command_string = submission_command(
             content=proposal.absolute(),
+            submission_identifier=submission_identifier,
             submitter=submitter,
             proposal_code=proposal_code,
         )
@@ -93,9 +94,9 @@ async def execute_submission(
             command.insert(-1, proposal_code)
         await log_submission_message(
             database=database,
-            identifier=submission_identifier,
             message="Inserting proposal into the database",
             message_type=SubmissionMessageType.INFO,
+            identifier=submission_identifier,
         )
         cp = subprocess.run(command)
         if cp.returncode:
@@ -120,13 +121,17 @@ async def execute_submission(
 
 
 def submission_command(
-    content: pathlib.Path, submitter: str, proposal_code: Optional[str]
+    content: pathlib.Path,
+    submitter: str,
+    proposal_code: Optional[str],
+    submission_identifier: str,
 ) -> str:
     """Generate the command for submitting the proposal."""
     log_name = mapping_log_name(proposal_code)
     command = f"""
     java -Xms85m -Xmx1024m
          -jar {os.environ['MAPPING_TOOL_JAR']}
+         -submissionIdentifier {submission_identifier}
          -access {os.environ['MAPPING_TOOL_DATABASE_ACCESS_CONFIG']}
          -log {os.environ['MAPPING_TOOL_LOG_DIR']}/{log_name}
          -user {submitter}
